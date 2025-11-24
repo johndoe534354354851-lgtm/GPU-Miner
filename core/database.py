@@ -55,6 +55,7 @@ class Database:
                     difficulty TEXT,
                     found_at TIMESTAMP,
                     status TEXT DEFAULT 'pending', -- pending, accepted, rejected
+                    is_dev_solution BOOLEAN DEFAULT 0,
                     FOREIGN KEY(address) REFERENCES wallets(address)
                 )
             ''')
@@ -82,6 +83,17 @@ class Database:
                 )
             ''')
             
+            # Migrate existing tables to add new columns if they don't exist
+            try:
+                cursor.execute('ALTER TABLE wallets ADD COLUMN is_dev_wallet BOOLEAN DEFAULT 0')
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            try:
+                cursor.execute('ALTER TABLE solutions ADD COLUMN is_dev_solution BOOLEAN DEFAULT 0')
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
             conn.commit()
             conn.close()
             logging.info(f"Database initialized at {self.db_path}")
@@ -101,7 +113,7 @@ class Database:
                 wallet_data['signing_key'],
                 wallet_data['signature'],
                 wallet_data.get('created_at', datetime.now().isoformat()),
-                is_dev_wallet
+                1 if is_dev_wallet else 0
             ))
             conn.commit()
             return True
@@ -110,16 +122,16 @@ class Database:
             return False
 
     def get_wallets(self, include_dev=False):
-        """Get wallets, optionally including dev wallets"""
+        """Get wallets. By default, excludes dev wallets from the list."""
         conn = self._get_conn()
         if include_dev:
             cursor = conn.execute('SELECT * FROM wallets')
         else:
             cursor = conn.execute('SELECT * FROM wallets WHERE is_dev_wallet = 0')
         return [dict(row) for row in cursor.fetchall()]
-
+    
     def get_dev_wallets(self):
-        """Get only developer fee wallets"""
+        """Get only dev wallets."""
         conn = self._get_conn()
         cursor = conn.execute('SELECT * FROM wallets WHERE is_dev_wallet = 1')
         return [dict(row) for row in cursor.fetchall()]
@@ -135,13 +147,13 @@ class Database:
         except Exception as e:
             logging.error(f"DB Error marking wallet consolidated: {e}")
 
-    def add_solution(self, challenge_id, nonce, address, difficulty):
+    def add_solution(self, challenge_id, nonce, address, difficulty, is_dev_solution=False):
         conn = self._get_conn()
         try:
             conn.execute('''
-                INSERT INTO solutions (challenge_id, nonce, address, difficulty, found_at)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (challenge_id, nonce, address, difficulty, datetime.now().isoformat()))
+                INSERT INTO solutions (challenge_id, nonce, address, difficulty, found_at, is_dev_solution)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (challenge_id, nonce, address, difficulty, datetime.now().isoformat(), 1 if is_dev_solution else 0))
             conn.commit()
         except Exception as e:
             logging.error(f"DB Error adding solution: {e}")
@@ -156,11 +168,14 @@ class Database:
         except Exception as e:
             logging.error(f"DB Error updating solution: {e}")
 
-    def get_total_solutions(self):
-        """Get total number of accepted solutions."""
+    def get_total_solutions(self, include_dev=False):
+        """Get total number of accepted solutions. By default, excludes dev solutions."""
         conn = self._get_conn()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM solutions WHERE status = 'accepted'")
+            if include_dev:
+                cursor = conn.execute("SELECT COUNT(*) FROM solutions WHERE status = 'accepted'")
+            else:
+                cursor = conn.execute("SELECT COUNT(*) FROM solutions WHERE status = 'accepted' AND is_dev_solution = 0")
             return cursor.fetchone()[0]
         except Exception as e:
             logging.error(f"DB Error counting solutions: {e}")

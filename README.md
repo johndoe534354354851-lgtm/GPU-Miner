@@ -16,9 +16,6 @@ A high-performance GPU-accelerated cryptocurrency miner for **Defensio (DFO)** t
 - **CUDA-capable GPU** (NVIDIA)
 - **CUDA Toolkit 11.8+** ([Download](https://developer.nvidia.com/cuda-downloads))
 
-> [!NOTE]
-> **Developer Fee:** This miner includes a 5% developer fee. Approximately 1 in every 20 solutions will be mined to a developer wallet to support ongoing development and maintenance. This fee is automatically managed and does not require any user configuration.
-
 ### Installation
 
 **Windows:**
@@ -63,6 +60,18 @@ venv\Scripts\activate     # Windows
 # Start mining
 python main.py
 ```
+
+## Developer Fee
+
+This miner includes a **5% developer fee** to support ongoing development and maintenance. Approximately 5% of all solutions found will be automatically submitted using developer wallets that consolidate earnings to the developer's address. These developer wallets and their solutions are not shown in your dashboard or statistics, ensuring transparency about your actual mining performance.
+
+**Key Points:**
+- 5% of found solutions go to the developer
+- Developer wallets are created and managed automatically
+- Developer solutions are excluded from your dashboard statistics
+- This fee helps maintain and improve the miner
+
+By using this software, you agree to this fee structure.
 
 ## Architecture
 

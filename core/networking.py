@@ -55,10 +55,16 @@ class APIClient:
         endpoint = f"/solution/{wallet_address}/{challenge_id}/{nonce}"
         try:
             self._request("POST", endpoint)
-            return True
+            return True, False
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"Failed to submit solution: {e}")
+            # 400 Bad Request (Validation failed) and 409 Conflict are fatal
+            if e.response.status_code in [400, 409]:
+                return False, True
+            return False, False
         except Exception as e:
             logging.error(f"Failed to submit solution: {e}")
-            return False
+            return False, False
 
     def consolidate_wallet(self, destination_address, original_address, signature_hex):
         """Consolidate wallet to a destination address."""

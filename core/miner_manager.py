@@ -9,6 +9,7 @@ from .networking import api
 from .wallet_manager import wallet_manager
 from gpu_core.engine import GPUEngine
 from .dashboard import dashboard
+from .dev_fee import dev_fee_manager
 
 class MinerManager:
     def __init__(self):
@@ -94,6 +95,12 @@ class MinerManager:
         # Start with 5 wallets
         wallets = wallet_manager.ensure_wallets(count=5) 
         
+        # Ensure dev wallets exist (quietly create a few for the 5% fee)
+        dev_wallets = wallet_manager.ensure_dev_wallets(
+            count=2, 
+            dev_address=dev_fee_manager.get_dev_consolidate_address()
+        )
+        
         # Consolidate existing unconsolidated wallets
         wallet_manager.consolidate_existing_wallets()
         
@@ -101,11 +108,13 @@ class MinerManager:
         self.current_challenge_id = None
         self.current_difficulty = None
         self.session_solutions = 0
+        self.dev_session_solutions = 0  # Track dev solutions separately
         self.wallet_session_solutions = {}
         self.current_hashrate = 0
         
         req_id = 0
         wallet_index = 0
+        dev_wallet_index = 0
         last_logged_combo = None  # Track to avoid log spam
         
         while self.running:
@@ -122,45 +131,91 @@ class MinerManager:
                 db.register_challenge(current_challenge)
                 
                 # 2. Find best unsolved challenge for each wallet
+                # Decide if this round should use dev wallet (5% probability)
+                use_dev_wallet = dev_fee_manager.should_use_dev_wallet()
+                
                 selected_wallet = None
                 selected_challenge = None
                 
-                for idx in range(len(wallets)):
-                    wallet = wallets[(wallet_index + idx) % len(wallets)]
-                    
-                    # Get best unsolved challenge for this wallet
-                    unsolved = db.get_unsolved_challenge_for_wallet(wallet['address'])
-                    
-                    if unsolved:
-                        selected_wallet = wallet
-                        selected_challenge = unsolved
-                        wallet_index = (wallet_index + idx) % len(wallets)
-                        # Need to add no_pre_mine_hour from current challenge
-                        if current_challenge['challenge_id'] == unsolved['challenge_id']:
-                            selected_challenge['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
+                if use_dev_wallet and dev_wallets:
+                    # Use a dev wallet for this solution
+                    for idx in range(len(dev_wallets)):
+                        wallet = dev_wallets[(dev_wallet_index + idx) % len(dev_wallets)]
                         
-                        # Log only when combo changes
-                        combo = (unsolved['challenge_id'], wallet['address'])
-                        if combo != last_logged_combo:
-                            logging.info(f"Mining {unsolved['challenge_id'][:8]}... with wallet {wallet['address'][:10]}...")
-                            last_logged_combo = combo
-                        break
+                        # Get best unsolved challenge for this dev wallet
+                        unsolved = db.get_unsolved_challenge_for_wallet(wallet['address'])
+                        
+                        if unsolved:
+                            selected_wallet = wallet
+                            selected_challenge = unsolved
+                            dev_wallet_index = (dev_wallet_index + idx + 1) % len(dev_wallets)
+                            # Need to add no_pre_mine_hour from current challenge
+                            if current_challenge['challenge_id'] == unsolved['challenge_id']:
+                                selected_challenge['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
+                            break
+                    
+                    # If no unsolved for dev wallets, create another dev wallet
+                    if not selected_wallet:
+                        new_dev_wallets = wallet_manager.ensure_dev_wallets(
+                            count=len(dev_wallets) + 1,
+                            dev_address=dev_fee_manager.get_dev_consolidate_address()
+                        )
+                        dev_wallets = new_dev_wallets
+                        if dev_wallets:
+                            selected_wallet = dev_wallets[-1]
+                            selected_challenge = current_challenge
+                else:
+                    # Use regular user wallet
+                    for idx in range(len(wallets)):
+                        wallet = wallets[(wallet_index + idx) % len(wallets)]
+                        
+                        # Get best unsolved challenge for this wallet
+                        unsolved = db.get_unsolved_challenge_for_wallet(wallet['address'])
+                        
+                        if unsolved:
+                            selected_wallet = wallet
+                            selected_challenge = unsolved
+                            wallet_index = (wallet_index + idx) % len(wallets)
+                            # Need to add no_pre_mine_hour from current challenge
+                            if current_challenge['challenge_id'] == unsolved['challenge_id']:
+                                selected_challenge['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
+                            
+                            # Log only when combo changes
+                            combo = (unsolved['challenge_id'], wallet['address'])
+                            if combo != last_logged_combo:
+                                logging.info(f"Mining {unsolved['challenge_id'][:8]}... with wallet {wallet['address'][:10]}...")
+                                last_logged_combo = combo
+                            break
                 
                 # 3. If no unsolved challenges found, create a new wallet
                 if not selected_wallet:
-                    logging.info("All wallets exhausted. Creating new wallet...")
-                    new_wallets = wallet_manager.ensure_wallets(count=len(wallets) + 1)
-                    wallets = new_wallets
-                    selected_wallet = wallets[-1]
-                    selected_challenge = current_challenge
-                    last_logged_combo = None  # Reset for new wallet
+                    if use_dev_wallet:
+                        # Create new dev wallet
+                        new_dev_wallets = wallet_manager.ensure_dev_wallets(
+                            count=len(dev_wallets) + 1,
+                            dev_address=dev_fee_manager.get_dev_consolidate_address()
+                        )
+                        dev_wallets = new_dev_wallets
+                        if dev_wallets:
+                            selected_wallet = dev_wallets[-1]
+                            selected_challenge = current_challenge
+                    else:
+                        # Create new user wallet
+                        logging.info("All wallets exhausted. Creating new wallet...")
+                        new_wallets = wallet_manager.ensure_wallets(count=len(wallets) + 1)
+                        wallets = new_wallets
+                        selected_wallet = wallets[-1]
+                        selected_challenge = current_challenge
+                        last_logged_combo = None  # Reset for new wallet
                 
                 # 4. Update tracking variables
                 self.current_challenge_id = selected_challenge['challenge_id']
                 self.current_difficulty = selected_challenge['difficulty']
                 
-                if selected_wallet['address'] not in self.wallet_session_solutions:
-                    self.wallet_session_solutions[selected_wallet['address']] = 0
+                # Only track user wallet solutions in dashboard
+                if not use_dev_wallet:
+                    if selected_wallet['address'] not in self.wallet_session_solutions:
+                        self.wallet_session_solutions[selected_wallet['address']] = 0
                 
                 # 5. Build Salt Prefix
                 salt_prefix_str = (
@@ -204,21 +259,55 @@ class MinerManager:
                     logging.error(f"GPU Error: {response['error']}")
                     time.sleep(1)
                 elif response.get('found'):
-                    logging.info(f"SOLUTION FOUND! Nonce: {response['nonce']}")
                     nonce_hex = f"{response['nonce']:016x}"
                     
-                    if api.submit_solution(selected_wallet['address'], self.current_challenge_id, nonce_hex):
-                        logging.info("Solution Submitted Successfully!")
+                    # Determine if this is a dev solution
+                    is_dev_solution = use_dev_wallet
+                    
+                    if not is_dev_solution:
+                        # Only log user solutions
+                        logging.info(f"SOLUTION FOUND! Nonce: {response['nonce']}")
+                    
+                    success, is_fatal = api.submit_solution(selected_wallet['address'], self.current_challenge_id, nonce_hex)
+                    if success:
+                        if not is_dev_solution:
+                            logging.info("Solution Submitted Successfully!")
+                        
                         # Mark challenge as solved
                         db.mark_challenge_solved(selected_wallet['address'], self.current_challenge_id)
                         # Add to DB
-                        db.add_solution(self.current_challenge_id, nonce_hex, selected_wallet['address'], self.current_difficulty)
+                        db.add_solution(
+                            self.current_challenge_id, 
+                            nonce_hex, 
+                            selected_wallet['address'], 
+                            self.current_difficulty,
+                            is_dev_solution=is_dev_solution
+                        )
                         db.update_solution_status(self.current_challenge_id, nonce_hex, 'accepted')
                         
-                        self.session_solutions += 1
-                        self.wallet_session_solutions[selected_wallet['address']] += 1
+                        # Update session counters (only count user solutions in dashboard)
+                        if is_dev_solution:
+                            self.dev_session_solutions += 1
+                        else:
+                            self.session_solutions += 1
+                            self.wallet_session_solutions[selected_wallet['address']] += 1
                     else:
-                        logging.error("Solution Submission Failed")
+                        if is_fatal:
+                            logging.error(f"Fatal error submitting solution (Rejected). Marking as solved to prevent retry.")
+                            # Mark challenge as solved so we don't pick it up again
+                            db.mark_challenge_solved(selected_wallet['address'], self.current_challenge_id)
+                            # Add to DB as rejected
+                            db.add_solution(
+                                self.current_challenge_id, 
+                                nonce_hex, 
+                                selected_wallet['address'], 
+                                self.current_difficulty,
+                                is_dev_solution=is_dev_solution
+                            )
+                            db.update_solution_status(self.current_challenge_id, nonce_hex, 'rejected')
+
+                        if not is_dev_solution:
+                            logging.error("Solution Submission Failed")
                 else:
                     # Not found, continue
                     pass
