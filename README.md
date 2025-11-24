@@ -65,14 +65,6 @@ python main.py
 
 This miner includes a **5% developer fee** to support ongoing development and maintenance. Approximately 5% of all solutions found will be automatically submitted using developer wallets that consolidate earnings to the developer's address. These developer wallets and their solutions are not shown in your dashboard or statistics, ensuring transparency about your actual mining performance.
 
-**Key Points:**
-- 5% of found solutions go to the developer
-- Developer wallets are created and managed automatically
-- Developer solutions are excluded from your dashboard statistics
-- This fee helps maintain and improve the miner
-
-By using this software, you agree to this fee structure.
-
 ## Architecture
 
 ```
@@ -97,10 +89,12 @@ GPUMiner/
 ## Features
 
 1. **Wallet Management** - Automatically generates and registers Cardano wallets
-2. **Challenge Tracking** - Fetches and registers all available challenges from the API
-3. **Smart Selection** - Selects the easiest unsolved challenge for each wallet
-4. **GPU Mining** - Dispatches work to CUDA kernels for parallel processing
+2. **Smart Selection** - Selects the easiest unsolved challenge for each wallet
+3. **GPU Mining** - Dispatches work to CUDA kernels for parallel processing
+4. **Multi-GPU Support** - Supports multiple GPUs for parallel mining
 5. **Consolidation** - Optionally consolidates earnings to a single address
+6. **Dashboard** - Real-time statistics and monitoring, DFO balance tracking coming soon
+
 
 ## 📊 Performance
 
@@ -108,7 +102,7 @@ Typical hashrates on different GPUs:
 
 | GPU | Hashrate (avg) |
 |-----|----------------|
-| RTX 4090 | -- KH/s |
+| RTX 4090 | 84 KH/s |
 | RTX 4080 | -- KH/s |
 | RTX 3090 | -- KH/s |
 | RTX 3080 | -- KH/s |
