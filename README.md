@@ -138,7 +138,8 @@ This software is provided "as is" without warranty of any kind. Use at your own 
 ## Support
 
 - **Issues**: [GitHub Issues](../../issues)
-- **Discussions**: [GitHub Discussions](../../discussions)
+- **Discord**: [Herolias](https://discord.gg/Herolias)
+- **X**: [Herolias](https://x.com/Herolias)
 - **Updates**: Watch this repository for updates
 
 
