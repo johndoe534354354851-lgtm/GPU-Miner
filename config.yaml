@@ -1,5 +1,5 @@
 gpu:
-  batch_size: 1000000
+  batch_size: 50000
   blocks_per_sm: 0
   enabled: true
 miner:

@@ -20,15 +20,15 @@ A high-performance GPU-accelerated cryptocurrency miner for **Defensio (DFO)** t
 
 **Windows:**
 ```powershell
-git clone https://github.com/yourusername/gpu-miner.git
-cd gpu-miner
+git clone https://github.com/Herolias/GPU-Miner.git
+cd GPU-Miner
 .\scripts\install.bat
 ```
 
 **Linux:**
 ```bash
-git clone https://github.com/yourusername/gpu-miner.git
-cd gpu-miner
+git clone https://github.com/Herolias/GPU-Miner.git
+cd GPU-Miner
 chmod +x scripts/install.sh
 ./scripts/install.sh
 ```
