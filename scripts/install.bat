@@ -13,7 +13,7 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python is not installed!
     echo.
-    echo Please install Python 3.12+ from: https://www.python.org/downloads/
+    echo Please install Python 3.12+ from: www.python.org/downloads/
     echo Make sure to check "Add Python to PATH" during installation.
     echo.
     pause
@@ -70,7 +70,7 @@ if %CUDA_FOUND% equ 0 (
     echo CUDA is required for GPU acceleration. Without it, PyCUDA installation will fail.
     echo.
     echo Download CUDA Toolkit from:
-   echo   https://developer.nvidia.com/cuda-downloads
+    echo   developer.nvidia.com/cuda-downloads
     echo.
     echo Recommended versions: CUDA 11.8, 12.x, or 13.x
     echo.
@@ -115,14 +115,14 @@ if %MSVC_FOUND% equ 0 (
     echo.
     echo These tools are required to compile PyCUDA.
     echo.
-    echo Option 1 - Build Tools for Visual Studio (Recommended):
-    echo   Download: https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
+    echo Option 1 - Build Tools for Visual Studio ^(Recommended^):
+    echo   Download from: visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
     echo   - Run the installer
     echo   - Select "Desktop development with C++"
-    echo   - Install (requires ~7GB disk space)
+    echo   - Install ^(requires ~7GB disk space^)
     echo.
     echo Option 2 - Full Visual Studio Community:
-    echo   Download: https://visualstudio.microsoft.com/vs/community/
+    echo   Download from: visualstudio.microsoft.com/vs/community/
     echo   - Free for individual developers
     echo   - Select "Desktop development with C++" workload
     echo.
@@ -174,8 +174,8 @@ if %errorlevel% neq 0 (
     echo [ERROR] Installation failed!
     echo.
     echo Common reasons:
-    echo   1. Missing CUDA Toolkit - Install from https://developer.nvidia.com/cuda-downloads
-    echo   2. Missing C++ Build Tools - Install from https://visualstudio.microsoft.com/downloads/
+    echo   1. Missing CUDA Toolkit - Install from developer.nvidia.com/cuda-downloads
+    echo   2. Missing C++ Build Tools - Install from visualstudio.microsoft.com/downloads/
     echo   3. Incompatible versions - Ensure CUDA 11.8+ and Python 3.12+
     echo.
     echo Please fix the issues above and run this script again.
