@@ -2,6 +2,7 @@ import threading
 import time
 import logging
 import multiprocessing as mp
+import subprocess
 import random
 from .config import config
 from .database import db
@@ -37,13 +38,18 @@ class MinerManager:
             dashboard.set_loading("Initializing GPUs...")
             
             try:
-                import pycuda.driver as cuda
-                cuda.init()
-                device_count = cuda.Device.count()
-                logging.info(f"Detected {device_count} CUDA devices")
+                # Use nvidia-smi to count devices to avoid initializing CUDA in parent process
+                result = subprocess.check_output(
+                    ['nvidia-smi', '--query-gpu=count', '--format=csv,noheader'], 
+                    encoding='utf-8'
+                )
+                device_count = int(result.strip())
+                logging.info(f"Detected {device_count} CUDA devices via nvidia-smi")
             except Exception as e:
-                logging.error(f"Failed to detect CUDA devices: {e}")
-                device_count = 0
+                logging.error(f"Failed to detect CUDA devices via nvidia-smi: {e}")
+                # Fallback to 1 device if we know we have GPUs but nvidia-smi failed
+                device_count = 1
+                logging.warning("Falling back to 1 GPU device")
 
             if device_count > 0:
                 for i in range(device_count):
