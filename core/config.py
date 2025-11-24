@@ -15,6 +15,7 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "batch_size": 1000000, # Target hashes per batch
         "blocks_per_sm": 0,    # 0 = Auto
+            "warmup_batch": 250000,
     },
     "wallet": {
         "file": "wallets.db", # SQLite DB file

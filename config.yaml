@@ -1,12 +1,13 @@
 gpu:
-  batch_size: 1000000
+  batch_size: 5000000
   blocks_per_sm: 0
+  warmup_batch: 250000
   enabled: true
 miner:
   api_url: https://mine.defensio.io/api
   donation_enabled: true
   donation_rate: 0.05
-  max_workers: 1
+  max_workers: 4
   name: GPUMiner
   version: 0.0.1
 wallet:

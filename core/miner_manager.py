@@ -32,6 +32,12 @@ class MinerManager:
         self.manager_thread = threading.Thread(target=self._manage_mining)
         self.manager_thread.start()
         
+        # Start Challenge Poller Thread
+        self.latest_challenge = None
+        self.challenge_lock = threading.Lock()
+        self.poller_thread = threading.Thread(target=self._poll_challenge_loop)
+        self.poller_thread.start()
+
         # Start Dashboard Thread
         self.dashboard_thread = threading.Thread(target=self._update_dashboard_loop)
         self.dashboard_thread.start()
@@ -63,6 +69,22 @@ class MinerManager:
         
         logging.info("Miner Manager stopped")
 
+    def _poll_challenge_loop(self):
+        while self.running:
+            try:
+                challenge = api.get_current_challenge()
+                if challenge:
+                    with self.challenge_lock:
+                        self.latest_challenge = challenge
+                    
+                    # Register the challenge in DB
+                    db.register_challenge(challenge)
+                
+                time.sleep(1.0) # Poll every second
+            except Exception as e:
+                logging.error(f"Challenge polling error: {e}")
+                time.sleep(5)
+
     def _update_dashboard_loop(self):
         while self.running:
             try:
@@ -79,7 +101,7 @@ class MinerManager:
                     session_sol=self.session_solutions if hasattr(self, 'session_solutions') else 0,
                     all_time_sol=all_time,
                     wallet_sols=self.wallet_session_solutions if hasattr(self, 'wallet_session_solutions') else {},
-                    active_wallets=1, # TODO: Dynamic
+                    active_wallets=self.active_wallet_count if hasattr(self, 'active_wallet_count') else 0,
                     challenge=self.current_challenge_id if hasattr(self, 'current_challenge_id') else "Waiting...",
                     difficulty=self.current_difficulty if hasattr(self, 'current_difficulty') else "N/A"
                 )
@@ -91,7 +113,7 @@ class MinerManager:
 
     def _manage_mining(self):
         # Ensure wallets exist
-        max_workers = config.get("miner.max_workers", 1)
+        max_workers = max(1, config.get("miner.max_workers", 1))
         # Start with 5 wallets
         wallets = wallet_manager.ensure_wallets(count=5) 
         
@@ -111,6 +133,18 @@ class MinerManager:
         self.dev_session_solutions = 0  # Track dev solutions separately
         self.wallet_session_solutions = {}
         self.current_hashrate = 0
+        self.active_wallet_count = 0
+        
+        def build_salt_prefix(wallet_addr, challenge):
+            components = [
+                wallet_addr,
+                challenge.get('challenge_id', ''),
+                challenge.get('difficulty', ''),
+                challenge.get('no_pre_mine', ''),
+                challenge.get('latest_submission', ''),
+                challenge.get('no_pre_mine_hour', '')
+            ]
+            return ''.join(components).encode('utf-8')
         
         req_id = 0
         wallet_index = 0
@@ -119,16 +153,18 @@ class MinerManager:
         
         while self.running:
             try:
-                # 1. Fetch and Register Current Challenge
-                current_challenge = api.get_current_challenge()
+                # 1. Get Current Challenge from Poller
+                with self.challenge_lock:
+                    current_challenge = self.latest_challenge
                 
                 if not current_challenge:
-                    logging.warning("Failed to get challenge, retrying...")
-                    time.sleep(5)
+                    self.active_wallet_count = 0
+                    logging.warning("Waiting for challenge...")
+                    time.sleep(1)
                     continue
                 
-                # Register the challenge in DB (so we track all challenges we've seen)
-                db.register_challenge(current_challenge)
+                # Register the challenge in DB (already done in poller, but safe to repeat or skip)
+                # db.register_challenge(current_challenge)
                 
                 # 2. Find best unsolved challenge for each wallet
                 # Decide if this round should use dev wallet (5% probability)
@@ -208,38 +244,76 @@ class MinerManager:
                         selected_challenge = current_challenge
                         last_logged_combo = None  # Reset for new wallet
                 
-                # 4. Update tracking variables
-                self.current_challenge_id = selected_challenge['challenge_id']
-                self.current_difficulty = selected_challenge['difficulty']
-                
-                # Only track user wallet solutions in dashboard
-                if not use_dev_wallet:
-                    if selected_wallet['address'] not in self.wallet_session_solutions:
-                        self.wallet_session_solutions[selected_wallet['address']] = 0
-                
-                # 5. Build Salt Prefix
-                salt_prefix_str = (
-                    selected_wallet['address'] + 
-                    selected_challenge['challenge_id'] +
-                    selected_challenge['difficulty'] + 
-                    selected_challenge['no_pre_mine'] +
-                    selected_challenge.get('latest_submission', '') + 
-                    selected_challenge.get('no_pre_mine_hour', '')
-                )
-                salt_prefix = salt_prefix_str.encode('utf-8')
-                
-                # 6. Dispatch to GPU
-                difficulty_value = int(selected_challenge['difficulty'][:8], 16)
-                start_nonce = random.getrandbits(64)
-                
+                rom_key = selected_challenge.get('no_pre_mine')
+                if not rom_key:
+                    logging.error("Selected challenge missing ROM key (no_pre_mine). Skipping.")
+                    time.sleep(1)
+                    continue
+
+                batch_contexts = [{
+                    'wallet': selected_wallet,
+                    'challenge': selected_challenge,
+                    'is_dev_solution': use_dev_wallet
+                }]
+
+                if max_workers > 1:
+                    candidate_wallets = dev_wallets if use_dev_wallet else wallets
+                    for wallet in candidate_wallets:
+                        if len(batch_contexts) >= max_workers:
+                            break
+                        if wallet['address'] == selected_wallet['address']:
+                            continue
+                        unsolved = db.get_unsolved_challenge_for_wallet(wallet['address'])
+                        if not unsolved:
+                            continue
+                        if unsolved.get('no_pre_mine') != rom_key:
+                            continue
+                        if current_challenge and current_challenge['challenge_id'] == unsolved['challenge_id']:
+                            unsolved['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
+                        batch_contexts.append({
+                            'wallet': wallet,
+                            'challenge': unsolved,
+                            'is_dev_solution': use_dev_wallet
+                        })
+
+                batch_metadata = []
+                gpu_tasks = []
+                for ctx in batch_contexts:
+                    salt_prefix = build_salt_prefix(ctx['wallet']['address'], ctx['challenge'])
+                    difficulty_field = ctx['challenge'].get('difficulty')
+                    difficulty_str = str(difficulty_field) if difficulty_field is not None else ''
+                    diff_str = difficulty_str.ljust(8, '0')
+                    difficulty_value = int(diff_str[:8], 16)
+                    start_nonce = random.getrandbits(64)
+                    gpu_tasks.append({
+                        'salt_prefix': salt_prefix,
+                        'difficulty': difficulty_value,
+                        'start_nonce': start_nonce
+                    })
+                    batch_metadata.append({
+                        'wallet': ctx['wallet'],
+                        'challenge': ctx['challenge'],
+                        'is_dev_solution': ctx['is_dev_solution']
+                    })
+
+                self.active_wallet_count = len(batch_metadata)
+
+                primary_challenge = batch_metadata[0]['challenge']
+                self.current_challenge_id = primary_challenge['challenge_id']
+                self.current_difficulty = primary_challenge['difficulty']
+
+                for meta in batch_metadata:
+                    if not meta['is_dev_solution']:
+                        addr = meta['wallet']['address']
+                        if addr not in self.wallet_session_solutions:
+                            self.wallet_session_solutions[addr] = 0
+
                 req_id += 1
                 request = {
                     'id': req_id,
                     'type': 'mine',
-                    'rom_key': selected_challenge['no_pre_mine'],
-                    'salt_prefix': salt_prefix,
-                    'difficulty': difficulty_value,
-                    'start_nonce': start_nonce
+                    'rom_key': rom_key,
+                    'tasks': gpu_tasks
                 }
                 
                 self.gpu_queue.put(request)
@@ -255,62 +329,77 @@ class MinerManager:
                 if not self.running:
                     break
                 
+                current_batch_metadata = batch_metadata
+
                 if response.get('error'):
                     logging.error(f"GPU Error: {response['error']}")
                     time.sleep(1)
-                elif response.get('found'):
-                    nonce_hex = f"{response['nonce']:016x}"
-                    
-                    # Determine if this is a dev solution
-                    is_dev_solution = use_dev_wallet
-                    
-                    if not is_dev_solution:
-                        # Only log user solutions
-                        logging.info(f"SOLUTION FOUND! Nonce: {response['nonce']}")
-                    
-                    success, is_fatal = api.submit_solution(selected_wallet['address'], self.current_challenge_id, nonce_hex)
-                    if success:
-                        if not is_dev_solution:
-                            logging.info("Solution Submitted Successfully!")
-                        
-                        # Mark challenge as solved
-                        db.mark_challenge_solved(selected_wallet['address'], self.current_challenge_id)
-                        # Add to DB
-                        db.add_solution(
-                            self.current_challenge_id, 
-                            nonce_hex, 
-                            selected_wallet['address'], 
-                            self.current_difficulty,
-                            is_dev_solution=is_dev_solution
+                else:
+                    task_results = response.get('task_results')
+                    if not task_results:
+                        task_results = [{
+                            'found': response.get('found', False),
+                            'nonce': response.get('nonce')
+                        }]
+                    if len(task_results) < len(current_batch_metadata):
+                        task_results.extend(
+                            [{'found': False, 'nonce': None}] * (len(current_batch_metadata) - len(task_results))
                         )
-                        db.update_solution_status(self.current_challenge_id, nonce_hex, 'accepted')
-                        
-                        # Update session counters (only count user solutions in dashboard)
-                        if is_dev_solution:
-                            self.dev_session_solutions += 1
-                        else:
-                            self.session_solutions += 1
-                            self.wallet_session_solutions[selected_wallet['address']] += 1
-                    else:
-                        if is_fatal:
-                            logging.error(f"Fatal error submitting solution (Rejected). Marking as solved to prevent retry.")
-                            # Mark challenge as solved so we don't pick it up again
-                            db.mark_challenge_solved(selected_wallet['address'], self.current_challenge_id)
-                            # Add to DB as rejected
-                            db.add_solution(
-                                self.current_challenge_id, 
-                                nonce_hex, 
-                                selected_wallet['address'], 
-                                self.current_difficulty,
-                                is_dev_solution=is_dev_solution
-                            )
-                            db.update_solution_status(self.current_challenge_id, nonce_hex, 'rejected')
+
+                    for meta, result in zip(current_batch_metadata, task_results):
+                        if not result.get('found'):
+                            continue
+                        nonce_val = result.get('nonce')
+                        if nonce_val is None:
+                            logging.error("GPU reported a found solution without nonce; skipping.")
+                            continue
+                        nonce_int = int(nonce_val)
+                        nonce_hex = f"{nonce_int:016x}"
+                        wallet_addr = meta['wallet']['address']
+                        challenge_id = meta['challenge']['challenge_id']
+                        difficulty_str = meta['challenge'].get('difficulty')
+                        if difficulty_str is None:
+                            difficulty_str = self.current_difficulty
+                        is_dev_solution = meta['is_dev_solution']
 
                         if not is_dev_solution:
-                            logging.error("Solution Submission Failed")
-                else:
-                    # Not found, continue
-                    pass
+                            logging.info(f"SOLUTION FOUND! Nonce: {nonce_int}")
+
+                        success, is_fatal = api.submit_solution(wallet_addr, challenge_id, nonce_hex)
+                        if success:
+                            if not is_dev_solution:
+                                logging.info("Solution Submitted Successfully!")
+                            
+                            db.mark_challenge_solved(wallet_addr, challenge_id)
+                            db.add_solution(
+                                challenge_id,
+                                nonce_hex,
+                                wallet_addr,
+                                difficulty_str,
+                                is_dev_solution=is_dev_solution
+                            )
+                            db.update_solution_status(challenge_id, nonce_hex, 'accepted')
+
+                            if is_dev_solution:
+                                self.dev_session_solutions += 1
+                            else:
+                                self.session_solutions += 1
+                                self.wallet_session_solutions[wallet_addr] += 1
+                        else:
+                            if is_fatal:
+                                logging.error("Fatal error submitting solution (Rejected). Marking as solved to prevent retry.")
+                                db.mark_challenge_solved(wallet_addr, challenge_id)
+                                db.add_solution(
+                                    challenge_id,
+                                    nonce_hex,
+                                    wallet_addr,
+                                    difficulty_str,
+                                    is_dev_solution=is_dev_solution
+                                )
+                                db.update_solution_status(challenge_id, nonce_hex, 'rejected')
+
+                            if not is_dev_solution:
+                                logging.error("Solution Submission Failed")
 
                 # Update hashrate estimate
                 if response.get('hashes') and response.get('duration'):
