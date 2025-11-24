@@ -1,0 +1,65 @@
+name: Build GPU Modules
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'gpu_core/engine.py'
+      - 'gpu_core/kernels.py'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python-version: ['3.12']
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Nuitka
+      run: |
+        python -m pip install --upgrade pip
+        pip install nuitka ordered-set zstandard
+    
+    - name: Build modules (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        python -m nuitka --module gpu_core/engine.py
+        python -m nuitka --module gpu_core/kernels.py
+        move *.pyd gpu_core/bin/windows/
+    
+    - name: Build modules (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        python -m nuitka --module gpu_core/engine.py
+        python -m nuitka --module gpu_core/kernels.py
+        mv *.so gpu_core/bin/linux/
+    
+    - name: Build modules (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        python -m nuitka --module gpu_core/engine.py
+        python -m nuitka --module gpu_core/kernels.py
+        mv *.so gpu_core/bin/macos/
+    
+    - name: Commit binaries
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add gpu_core/bin/
+        git diff --quiet && git diff --staged --quiet || git commit -m "Auto-build: Update GPU modules for ${{ runner.os }}"
+    
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
