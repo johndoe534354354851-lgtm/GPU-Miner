@@ -30,10 +30,11 @@ class MinerManager:
         self.dashboard_thread.start()
 
         gpu_enabled = config.get("gpu.enabled")
-        supports_loading = False
 
         # Start GPU Engine
         if gpu_enabled:
+            supports_loading = False
+            dashboard.set_loading("Building CUDA kernels...")
             self.gpu_ready_event = mp.Event()
             self.gpu_ready_flag = mp.Value('i', 0)
             self.gpu_process = GPUEngine(self.gpu_queue, self.gpu_response_queue)
@@ -41,7 +42,6 @@ class MinerManager:
             if hasattr(self.gpu_process, "set_ready_notifier"):
                 self.gpu_process.set_ready_notifier(self.gpu_ready_event, self.gpu_ready_flag)
                 supports_loading = True
-                dashboard.set_loading("Building CUDA kernels...")
 
             self.gpu_process.start()
             logging.info("GPU Engine process started")
@@ -51,7 +51,12 @@ class MinerManager:
                     logging.info("GPU kernels built successfully")
                 else:
                     logging.error("GPU initialization failed or timed out")
-                dashboard.set_loading(None)
+            else:
+                # If the GPU engine cannot signal readiness (e.g., native binary),
+                # keep the loading screen up for a short grace period.
+                time.sleep(config.get("gpu.kernel_build_delay", 5))
+
+            dashboard.set_loading(None)
 
         self.manager_thread = threading.Thread(target=self._manage_mining)
         self.manager_thread.start()
