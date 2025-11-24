@@ -1,12 +1,15 @@
 # GPU Miner
 
-A high-performance GPU-accelerated cryptocurrency miner for **Defensio (DFO)** tokens, built with CUDA and Python.
+A high-performance GPU-accelerated miner for **Defensio (DFO)** tokens, built with CUDA and Python.
+Let me know if I should add support for more projects.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![CUDA](https://img.shields.io/badge/CUDA-11.8+-green.svg)](https://developer.nvidia.com/cuda-downloads)
 
-
+## Warning
+Very experimental right now, expect bugs and frequent updates.
+Update via git pull or use `scripts/update.bat` or `scripts/update.sh`.
 
 ## Quick Start
 
@@ -96,7 +99,7 @@ GPUMiner/
 6. **Dashboard** - Real-time statistics and monitoring, DFO balance tracking coming soon
 
 
-## 📊 Performance
+## Performance
 
 Typical hashrates on different GPUs:
 
