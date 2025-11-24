@@ -10,5 +10,5 @@ miner:
   name: GPUMiner
   version: 0.0.1
 wallet:
-  consolidate_address: addr1q8xsj2q82rj3t2e9ky9tv7yg4g5hu78fekwzvd82xyhawpnwwxtnrl8ddv434lklnkwx9zvlyrsv5gmusxy6nqdxnarqqhh7pd
+  consolidate_address: null
   file: wallets.db
