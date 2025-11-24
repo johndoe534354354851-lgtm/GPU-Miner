@@ -116,7 +116,7 @@ if %MSVC_FOUND% equ 0 (
     echo These tools are required to compile PyCUDA.
     echo.
     echo Option 1 - Build Tools for Visual Studio ^(Recommended^):
-    echo   Download from: visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
+    echo   Download from: visualstudio.microsoft.com/downloads/?q=build+tools#build-tools-for-visual-studio-2026
     echo   - Run the installer
     echo   - Select "Desktop development with C++"
     echo   - Install ^(requires ~7GB disk space^)
@@ -175,7 +175,7 @@ if %errorlevel% neq 0 (
     echo.
     echo Common reasons:
     echo   1. Missing CUDA Toolkit - Install from developer.nvidia.com/cuda-downloads
-    echo   2. Missing C++ Build Tools - Install from visualstudio.microsoft.com/downloads/
+    echo   2. Missing C++ Build Tools - Install from visualstudio.microsoft.com/downloads/?q=build+tools
     echo   3. Incompatible versions - Ensure CUDA 11.8+ and Python 3.12+
     echo.
     echo Please fix the issues above and run this script again.
