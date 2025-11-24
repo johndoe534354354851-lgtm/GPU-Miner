@@ -39,11 +39,13 @@ class MinerManager:
             
             try:
                 # Use nvidia-smi to count devices to avoid initializing CUDA in parent process
+                # Note: --query-gpu=count returns the count repeated for each device found
                 result = subprocess.check_output(
                     ['nvidia-smi', '--query-gpu=count', '--format=csv,noheader'], 
                     encoding='utf-8'
                 )
-                device_count = int(result.strip())
+                # Take the first line, as the count is repeated
+                device_count = int(result.strip().split('\n')[0])
                 logging.info(f"Detected {device_count} CUDA devices via nvidia-smi")
             except Exception as e:
                 logging.error(f"Failed to detect CUDA devices via nvidia-smi: {e}")
