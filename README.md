@@ -113,6 +113,7 @@ Typical hashrates on different GPUs:
 *Performance varies based on challenge difficulty and system configuration.*
 
 
+
 ## Troubleshooting
 
 ### "No CUDA device found"
@@ -120,15 +121,26 @@ Typical hashrates on different GPUs:
 - Install CUDA Toolkit 11.8+
 - Verify installation with `nvidia-smi`
 
-### "Module 'gpu_core' not found"
-- GPU binaries are included in the repository
-- Verify `gpu_core/bin/<platform>/` contains `.pyd` (Windows) or `.so` (Linux/macOS) files
+### "Module 'gpu_core' not found" or "ModuleNotFoundError: No module named 'gpu_core.engine'"
+
+**Run from correct directory**
+```bash
+cd GPU-Miner  # Make sure you're in the GPUMiner directory
+#Activate virtual environment
+#Linux: source venv/bin/activate
+#Windows: venv\Scripts\activate.ps1
+python main.py
+```
+
+**Verify file structure**
+- Ensure `gpu_core/bin/<platform>/` contains `.pyd` (Windows) or `.so` (Linux/macOS) files
+- Check that `gpu_core/__init__.py` and `gpu_core/engine.py` exist
 - Re-clone the repository if files are missing
 
 ### "GPU module import failed"
-- Ensure Python version is 3.12+
-- Check that you're using the correct platform binaries
+- Ensure Python version is 3.12+: `python --version`
 - Verify all dependencies are installed: `pip install -r requirements.txt`
+- If using a virtual environment, make sure it's activated
 
 
 ## License
@@ -138,8 +150,8 @@ This project uses a dual-license model:
 - **Core Infrastructure** (everything except `gpu_core/`): [MIT License](LICENSE)
 - **GPU Acceleration Module** (`gpu_core/`): Proprietary
   - Source code is **not** included in this repository
-  - Pre-compiled binaries are provided for Windows, Linux, and macOS
-  - Reverse engineering or decompilation is prohibited
+  - Pre-compiled binaries are provided for Windows, Linux
+
 
 See the [LICENSE](LICENSE) file for details.
 

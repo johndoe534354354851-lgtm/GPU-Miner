@@ -1,9 +1,17 @@
+#!/usr/bin/env python3
+"""GPU Miner - Main Entry Point"""
+
 import sys
+import os
+from pathlib import Path
+
+# Ensure the script directory is in Python's module search path
+# This allows imports to work regardless of where the script is run from
+script_dir = Path(__file__).parent.resolve()
+if str(script_dir) not in sys.path:
+    sys.path.insert(0, str(script_dir))
+
 import time
-import signal
-from core.logger import setup_logging
-from core.config import config
-import sys
 import signal
 import logging
 from core.logger import setup_logging
