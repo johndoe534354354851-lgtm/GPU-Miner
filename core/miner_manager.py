@@ -189,9 +189,6 @@ class MinerManager:
                             selected_wallet = wallet
                             selected_challenge = unsolved
                             dev_wallet_index = (dev_wallet_index + idx + 1) % len(dev_wallets)
-                            # Need to add no_pre_mine_hour from current challenge
-                            if current_challenge['challenge_id'] == unsolved['challenge_id']:
-                                selected_challenge['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
                             break
                     
                     # If no unsolved for dev wallets, create another dev wallet
@@ -216,9 +213,6 @@ class MinerManager:
                             selected_wallet = wallet
                             selected_challenge = unsolved
                             wallet_index = (wallet_index + idx) % len(wallets)
-                            # Need to add no_pre_mine_hour from current challenge
-                            if current_challenge['challenge_id'] == unsolved['challenge_id']:
-                                selected_challenge['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
                             
                             # Log only when combo changes
                             combo = (unsolved['challenge_id'], wallet['address'])
