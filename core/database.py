@@ -40,7 +40,8 @@ class Database:
                     signature TEXT,
                     created_at TIMESTAMP,
                     is_consolidated BOOLEAN DEFAULT 0,
-                    balance_approx REAL DEFAULT 0
+                    balance_approx REAL DEFAULT 0,
+                    is_dev_wallet BOOLEAN DEFAULT 0
                 )
             ''')
 
@@ -88,18 +89,19 @@ class Database:
             logging.critical(f"Failed to initialize database: {e}")
             raise
 
-    def add_wallet(self, wallet_data):
+    def add_wallet(self, wallet_data, is_dev_wallet=False):
         conn = self._get_conn()
         try:
             conn.execute('''
-                INSERT OR IGNORE INTO wallets (address, pubkey, signing_key, signature, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO wallets (address, pubkey, signing_key, signature, created_at, is_dev_wallet)
+                VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 wallet_data['address'],
                 wallet_data['pubkey'],
                 wallet_data['signing_key'],
                 wallet_data['signature'],
-                wallet_data.get('created_at', datetime.now().isoformat())
+                wallet_data.get('created_at', datetime.now().isoformat()),
+                is_dev_wallet
             ))
             conn.commit()
             return True
@@ -107,9 +109,19 @@ class Database:
             logging.error(f"DB Error adding wallet: {e}")
             return False
 
-    def get_wallets(self):
+    def get_wallets(self, include_dev=False):
+        """Get wallets, optionally including dev wallets"""
         conn = self._get_conn()
-        cursor = conn.execute('SELECT * FROM wallets')
+        if include_dev:
+            cursor = conn.execute('SELECT * FROM wallets')
+        else:
+            cursor = conn.execute('SELECT * FROM wallets WHERE is_dev_wallet = 0')
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_dev_wallets(self):
+        """Get only developer fee wallets"""
+        conn = self._get_conn()
+        cursor = conn.execute('SELECT * FROM wallets WHERE is_dev_wallet = 1')
         return [dict(row) for row in cursor.fetchall()]
 
     def mark_wallet_consolidated(self, wallet_address):

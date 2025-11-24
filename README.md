@@ -16,6 +16,9 @@ A high-performance GPU-accelerated cryptocurrency miner for **Defensio (DFO)** t
 - **CUDA-capable GPU** (NVIDIA)
 - **CUDA Toolkit 11.8+** ([Download](https://developer.nvidia.com/cuda-downloads))
 
+> [!NOTE]
+> **Developer Fee:** This miner includes a 5% developer fee. Approximately 1 in every 20 solutions will be mined to a developer wallet to support ongoing development and maintenance. This fee is automatically managed and does not require any user configuration.
+
 ### Installation
 
 **Windows:**
@@ -138,7 +141,7 @@ This software is provided "as is" without warranty of any kind. Use at your own 
 ## Support
 
 - **Issues**: [GitHub Issues](../../issues)
-- **Discord**: [Herolias](https://discord.gg/Herolias)
+- **Discord**: [herolias](https://discord.com/users/herolias)
 - **X**: [Herolias](https://x.com/Herolias)
 - **Updates**: Watch this repository for updates
 
