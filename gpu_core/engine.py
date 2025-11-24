@@ -200,7 +200,14 @@ class GPUEngine(mp.Process):
                 grid=(grid_size, 1)
             )
             
-            self.ctx.synchronize()
+            # Synchronize with interrupt handling
+            try:
+                self.ctx.synchronize()
+            except KeyboardInterrupt:
+                self.logger.info("Mining interrupted by user")
+                self.shutdown_event.set()
+                return
+            
             end_time = time.perf_counter()
             duration = end_time - start_time
             

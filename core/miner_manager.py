@@ -106,6 +106,7 @@ class MinerManager:
         
         req_id = 0
         wallet_index = 0
+        last_logged_combo = None  # Track to avoid log spam
         
         while self.running:
             try:
@@ -137,8 +138,12 @@ class MinerManager:
                         # Need to add no_pre_mine_hour from current challenge
                         if current_challenge['challenge_id'] == unsolved['challenge_id']:
                             selected_challenge['no_pre_mine_hour'] = current_challenge.get('no_pre_mine_hour', '')
-                        # Log once when we select a new challenge/wallet combo
-                        logging.info(f"Mining {unsolved['challenge_id'][:8]}... with wallet {wallet['address'][:10]}...")
+                        
+                        # Log only when combo changes
+                        combo = (unsolved['challenge_id'], wallet['address'])
+                        if combo != last_logged_combo:
+                            logging.info(f"Mining {unsolved['challenge_id'][:8]}... with wallet {wallet['address'][:10]}...")
+                            last_logged_combo = combo
                         break
                 
                 # 3. If no unsolved challenges found, create a new wallet
@@ -148,6 +153,7 @@ class MinerManager:
                     wallets = new_wallets
                     selected_wallet = wallets[-1]
                     selected_challenge = current_challenge
+                    last_logged_combo = None  # Reset for new wallet
                 
                 # 4. Update tracking variables
                 self.current_challenge_id = selected_challenge['challenge_id']
@@ -183,8 +189,16 @@ class MinerManager:
                 
                 self.gpu_queue.put(request)
                 
-                # 7. Wait for Response
-                response = self.gpu_response_queue.get()
+                # 7. Wait for Response (with timeout to allow Ctrl+C)
+                while self.running:
+                    try:
+                        response = self.gpu_response_queue.get(timeout=1.0)
+                        break
+                    except:
+                        continue
+                
+                if not self.running:
+                    break
                 
                 if response.get('error'):
                     logging.error(f"GPU Error: {response['error']}")
