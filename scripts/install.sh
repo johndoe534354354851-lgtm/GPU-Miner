@@ -64,21 +64,22 @@ echo ""
 echo "[3/5] Checking CUDA Toolkit..."
 CUDA_FOUND=0
 CUDA_VERSION=""
+CUDA_PATH_TO_EXPORT=""
 
-# Check for nvcc (CUDA compiler)
+# Check for nvcc (CUDA compiler) in PATH first
 if command -v nvcc &> /dev/null; then
     CUDA_FOUND=1
     CUDA_VERSION=$(nvcc --version | grep "release" | sed 's/.*release //' | awk '{print $1}' | sed 's/,//')
-    echo -e "${GREEN}[OK] CUDA Toolkit $CUDA_VERSION found${NC}"
+    echo -e "${GREEN}[OK] CUDA Toolkit $CUDA_VERSION found (nvcc in PATH)${NC}"
 else
-    # Check common CUDA paths
+    # nvcc not in PATH, check common CUDA installation paths
     for cuda_path in /usr/local/cuda-13.* /usr/local/cuda-12.* /usr/local/cuda-11.* /usr/local/cuda /opt/cuda; do
         if [ -d "$cuda_path" ] && [ -f "$cuda_path/bin/nvcc" ]; then
             CUDA_FOUND=1
             CUDA_VERSION=$($cuda_path/bin/nvcc --version | grep "release" | sed 's/.*release //' | awk '{print $1}' | sed 's/,//')
-            echo -e "${GREEN}[OK] CUDA Toolkit $CUDA_VERSION found at $cuda_path${NC}"
-            export PATH="$cuda_path/bin:$PATH"
-            export LD_LIBRARY_PATH="$cuda_path/lib64:$LD_LIBRARY_PATH"
+            CUDA_PATH_TO_EXPORT="$cuda_path"
+            echo -e "${YELLOW}[WARNING] CUDA Toolkit $CUDA_VERSION found at $cuda_path${NC}"
+            echo -e "${YELLOW}          but nvcc is not in PATH${NC}"
             break
         fi
     done
@@ -98,6 +99,29 @@ if [ $CUDA_FOUND -eq 0 ]; then
     echo "Recommended versions: CUDA 11.8, 12.x, or 13.x"
     echo ""
     read -p "Continue without CUDA (installation will likely fail)? [y/N]: " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+elif [ -n "$CUDA_PATH_TO_EXPORT" ]; then
+    # CUDA found but not in PATH - provide instructions
+    echo ""
+    echo -e "${YELLOW}IMPORTANT: Add CUDA to your environment${NC}"
+    echo "Run these commands or add them to ~/.bashrc:"
+    echo ""
+    echo "  export PATH=\"$CUDA_PATH_TO_EXPORT/bin:\$PATH\""
+    echo "  export LD_LIBRARY_PATH=\"$CUDA_PATH_TO_EXPORT/lib64:\$LD_LIBRARY_PATH\""
+    echo ""
+    echo "Then run 'source ~/.bashrc' or restart your terminal."
+    echo ""
+    
+    # Temporarily export for this session
+    export PATH="$CUDA_PATH_TO_EXPORT/bin:$PATH"
+    export LD_LIBRARY_PATH="$CUDA_PATH_TO_EXPORT/lib64:$LD_LIBRARY_PATH"
+    echo "Temporarily added CUDA to PATH for this installation session."
+    echo ""
+    
+    read -p "Continue with installation? [y/N]: " -n 1 -r
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1

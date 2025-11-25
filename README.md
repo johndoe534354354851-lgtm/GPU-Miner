@@ -142,6 +142,26 @@ python main.py
 - Verify all dependencies are installed: `pip install -r requirements.txt`
 - If using a virtual environment, make sure it's activated
 
+### "No such file or directory: 'nvcc'" (Linux)
+
+This means CUDA is installed but not in your PATH.
+
+**Solution:**
+```bash
+# Find your CUDA installation
+ls /usr/local/cuda-*/bin/nvcc
+
+# Add CUDA to PATH permanently (replace 12.x with your version)
+echo 'export PATH=/usr/local/cuda-12.x/bin:$PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.x/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+
+# Reload environment
+source ~/.bashrc
+
+# Verify nvcc is found
+nvcc --version
+```
+
 
 ## License
 
