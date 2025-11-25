@@ -87,7 +87,7 @@ REM ==========================================
 echo [4/5] Checking Microsoft C++ Build Tools...
 set MSVC_FOUND=0
 
-REM Check for cl.exe (MSVC compiler)
+REM Check for cl.exe (MSVC compiler) in PATH
 where cl.exe >nul 2>&1
 if %errorlevel% equ 0 (
     set MSVC_FOUND=1
@@ -95,17 +95,28 @@ if %errorlevel% equ 0 (
     goto msvc_check_done
 )
 
-REM Check common Visual Studio paths
-for %%v in (2022 2019 2017) do (
-    if exist "C:\Program Files\Microsoft Visual Studio\%%v\Community\VC\Tools\MSVC" (
+REM Check for Build Tools standalone installations (more common)
+for %%v in (2026 2025 2024 2023 2022 2019) do (
+    if exist "C:\Program Files (x86)\Microsoft Visual Studio\%%v\BuildTools\VC\Tools\MSVC" (
         set MSVC_FOUND=1
-        echo [OK] Visual Studio %%v found
+        echo [OK] Build Tools for Visual Studio %%v found
         goto msvc_check_done
     )
-    if exist "C:\Program Files (x86)\Microsoft Visual Studio\%%v\Community\VC\Tools\MSVC" (
-        set MSVC_FOUND=1
-        echo [OK] Visual Studio %%v found
-        goto msvc_check_done
+)
+
+REM Check common Visual Studio Community/Professional/Enterprise paths
+for %%v in (2026 2025 2024 2023 2022 2019 2017) do (
+    for %%e in (Community Professional Enterprise) do (
+        if exist "C:\Program Files\Microsoft Visual Studio\%%v\%%e\VC\Tools\MSVC" (
+            set MSVC_FOUND=1
+            echo [OK] Visual Studio %%v %%e found
+            goto msvc_check_done
+        )
+        if exist "C:\Program Files (x86)\Microsoft Visual Studio\%%v\%%e\VC\Tools\MSVC" (
+            set MSVC_FOUND=1
+            echo [OK] Visual Studio %%v %%e found
+            goto msvc_check_done
+        )
     )
 )
 
@@ -125,6 +136,9 @@ if %MSVC_FOUND% equ 0 (
     echo   Download from: visualstudio.microsoft.com/vs/community/
     echo   - Free for individual developers
     echo   - Select "Desktop development with C++" workload
+    echo.
+    echo IMPORTANT: If you just installed Build Tools, close this window
+    echo and open a NEW command prompt, then run this script again.
     echo.
     echo After installing, please run this script again.
     echo.
