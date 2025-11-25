@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 # Check 1: Python
 #==========================================
 echo "[1/5] Checking Python..."
-if ! command -v python3 &> /dev/null; then
+if ! command -v /usr/bin/python3 &> /dev/null; then
     echo -e "${RED}[ERROR] Python 3 is not installed!${NC}"
     echo ""
     echo "Please install Python 3.12+ using your package manager:"
@@ -27,7 +27,7 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+PYTHON_VERSION=$(/usr/bin/python3 --version 2>&1 | awk '{print $2}')
 echo -e "${GREEN}[OK] Python $PYTHON_VERSION found${NC}"
 echo ""
 
@@ -181,7 +181,7 @@ echo ""
 # Create virtual environment
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
-    python3 -m venv venv
+    /usr/bin/python3 -m venv venv
     if [ $? -ne 0 ]; then
         echo -e "${RED}[ERROR] Failed to create virtual environment${NC}"
         exit 1
